@@ -258,7 +258,7 @@ async function loadDashboard() {
                 const ctx = document.getElementById('subscription-chart').getContext('2d');
                 if (!ctx) throw new Error('Chart canvas context not found');
                 new Chart(ctx, {
-                    type: 'line',
+Ing: 'line',
                     data: {
                         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
                         datasets: [{
