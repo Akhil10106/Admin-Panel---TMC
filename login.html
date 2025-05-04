@@ -64,49 +64,19 @@
                 if (user) {
                     console.log('User logged in:', { uid: user.uid, email: user.email });
 
-                    // Check active session
-                    const activeSessionRef = db.ref('active_session');
-                    activeSessionRef.once('value', async snapshot => {
-                        const activeSession = snapshot.val();
-                        if (activeSession && activeSession.uid !== user.uid) {
-                            console.log('Terminating previous session:', activeSession.uid);
-                            await auth.signOut();
-                            await auth.signInWithEmailAndPassword(email, password);
-                        }
-
-                        // Set active session
-                        await activeSessionRef.set({
-                            uid: user.uid,
-                            email: user.email,
-                            timestamp: Date.now()
-                        });
-
-                        // Clear existing admin roles
-                        await db.ref('users').once('value', snapshot => {
-                            snapshot.forEach(child => {
-                                if (child.val().role === 'admin' && child.key !== user.uid) {
-                                    db.ref('users/' + child.key).update({ role: 'user' });
-                                }
-                            });
-                        });
-
-                        // Set current user as admin
-                        await db.ref('users/' + user.uid).set({
-                            id: user.uid,
-                            name: 'Admin User',
-                            email: user.email,
-                            role: 'admin',
-                            subscription_status: true,
-                            subscription_expiry: 9999999999999,
-                            trial_used: false
-                        });
-
-                        console.log('User set as admin:', user.email);
-                        window.location.href = '/index.html';
-                    }, error => {
-                        console.error('Error checking active session:', error);
-                        alert('Failed to verify session.');
+                    // Set current user as admin
+                    await db.ref('users/' + user.uid).set({
+                        id: user.uid,
+                        name: 'Admin User',
+                        email: user.email,
+                        role: 'admin',
+                        subscription_status: true,
+                        subscription_expiry: 9999999999999,
+                        trial_used: false
                     });
+
+                    console.log('User set as admin:', user.email);
+                    window.location.href = '/index.html';
                 } else {
                     alert('Authentication failed.');
                 }
@@ -119,15 +89,10 @@
         // Redirect if already logged in
         auth.onAuthStateChanged(user => {
             if (user) {
-                db.ref('active_session').once('value', snapshot => {
-                    const activeSession = snapshot.val();
-                    if (activeSession && activeSession.uid === user.uid) {
-                        db.ref('users/' + user.uid).once('value', snapshot => {
-                            const userData = snapshot.val();
-                            if (userData && userData.role === 'admin') {
-                                window.location.href = '/index.html';
-                            }
-                        });
+                db.ref('users/' + user.uid).once('value', snapshot => {
+                    const userData = snapshot.val();
+                    if (userData && userData.role === 'admin') {
+                        window.location.href = '/index.html';
                     }
                 });
             }
