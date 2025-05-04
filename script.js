@@ -1,6 +1,3 @@
-// Note: Ensure Firebase SDK is included via <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
-// and other required modules (e.g., firebase-auth, firebase-database)
-
 // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBJmnErOKgB5Pp45A00A1J_agJQFSPAyjY",
@@ -46,6 +43,8 @@ const revenueTableBody = document.getElementById('revenue-table-body');
 const recentActivity = document.getElementById('recent-activity');
 const adminNameElement = document.getElementById('admin-name');
 const revenueFilter = document.getElementById('revenue-filter');
+const loginView = document.getElementById('login-view');
+const adminPanel = document.getElementById('admin-panel');
 
 // Show Section
 function showSection(sectionId) {
@@ -94,12 +93,53 @@ function loadProfile(user, userData) {
     if (profileSubscription) profileSubscription.textContent = userData.subscription_plan || 'N/A';
 }
 
+// Handle Login
+async function handleLogin() {
+    const email = document.getElementById('login-email')?.value?.trim();
+    const password = document.getElementById('login-password')?.value;
+
+    if (!email || !password) {
+        alert('Please enter both email and password.');
+        return;
+    }
+
+    try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        if (user) {
+            console.log('User logged in:', { uid: user.uid, email: user.email });
+
+            // Set current user as admin
+            await db.ref('users/' + user.uid).set({
+                id: user.uid,
+                name: 'Admin User',
+                email: user.email,
+                role: 'admin',
+                subscription_status: true,
+                subscription_expiry: 9999999999999,
+                trial_used: false
+            });
+
+            console.log('User set as admin:', user.email);
+            // The auth state change handler will show the admin panel
+        } else {
+            alert('Authentication failed.');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed: ' + error.message);
+    }
+}
+
 // Authentication Check
 auth.onAuthStateChanged(user => {
     if (user) {
         db.ref('users/' + user.uid).once('value').then(snapshot => {
             const userData = snapshot.val();
             if (userData && userData.role === 'admin') {
+                // Show admin panel, hide login view
+                if (loginView) loginView.style.display = 'none';
+                if (adminPanel) adminPanel.style.display = 'flex';
                 if (adminNameElement) {
                     adminNameElement.textContent = userData.name || 'Admin';
                 }
@@ -119,18 +159,22 @@ auth.onAuthStateChanged(user => {
             } else {
                 alert('Access denied. Admin setup failed.');
                 auth.signOut().then(() => {
-                    window.location.href = '/login.html';
+                    if (loginView) loginView.style.display = 'flex';
+                    if (adminPanel) adminPanel.style.display = 'none';
                 });
             }
         }).catch(error => {
             console.error('Error fetching user data:', error);
             alert('Failed to verify user data. Error: ' + error.message);
             auth.signOut().then(() => {
-                window.location.href = '/login.html';
+                if (loginView) loginView.style.display = 'flex';
+                if (adminPanel) adminPanel.style.display = 'none';
             });
         });
     } else {
-        window.location.href = '/login.html';
+        // Show login view, hide admin panel
+        if (loginView) loginView.style.display = 'flex';
+        if (adminPanel) adminPanel.style.display = 'none';
     }
 });
 
@@ -258,13 +302,13 @@ async function loadDashboard() {
                 const ctx = document.getElementById('subscription-chart').getContext('2d');
                 if (!ctx) throw new Error('Chart canvas context not found');
                 new Chart(ctx, {
-Ing: 'line',
+                    type: 'line',
                     data: {
                         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
                         datasets: [{
                             label: 'Subscriptions',
                             data: [50, 75, 100, 120, 150],
-                            borderColor: '#2e71cc',
+                            borderColor: '#4f46e5',
                             fill: false
                         }]
                     },
@@ -718,7 +762,7 @@ function closeModal(modalId) {
 async function handleLogout() {
     try {
         await auth.signOut();
-        window.location.href = '/login.html';
+        // The auth state change handler will show the login view
     } catch (error) {
         console.error('Error signing out:', error);
         alert('Error logging out: ' + error.message);
