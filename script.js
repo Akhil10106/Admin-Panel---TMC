@@ -1,3 +1,6 @@
+// Note: Ensure Firebase SDK is included via <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
+// and other required modules (e.g., firebase-auth, firebase-database)
+
 // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBJmnErOKgB5Pp45A00A1J_agJQFSPAyjY",
@@ -42,13 +45,20 @@ const subscriptionTableBody = document.getElementById('subscription-table-body')
 const revenueTableBody = document.getElementById('revenue-table-body');
 const recentActivity = document.getElementById('recent-activity');
 const adminNameElement = document.getElementById('admin-name');
+const revenueFilter = document.getElementById('revenue-filter');
 
 // Show Section
 function showSection(sectionId) {
     sections.forEach(section => section.style.display = 'none');
-    document.getElementById(sectionId).style.display = 'block';
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.style.display = 'block';
+    }
     navLinks.forEach(link => link.classList.remove('active'));
-    document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
+    const activeLink = document.querySelector(`[data-section="${sectionId}"]`);
+    if (activeLink) {
+        activeLink.classList.add('active');
+    }
 }
 
 // Navigation
@@ -75,87 +85,59 @@ function loadProfile(user, userData) {
     const profileCreated = document.getElementById('profile-created');
     const profileSubscription = document.getElementById('profile-subscription');
 
-    profileName.textContent = userData.name || 'Admin User';
-    profileRole.textContent = userData.role.charAt(0).toUpperCase() + userData.role.slice(1) || 'Admin';
-    profileEmail.textContent = userData.email || user.email || 'N/A';
-    profilePhone.textContent = userData.phone || 'Not provided';
-    profileLastLogin.textContent = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString() : 'N/A';
-    profileCreated.textContent = user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleString() : 'N/A';
-    profileSubscription.textContent = userData.subscription_plan || 'N/A';
+    if (profileName) profileName.textContent = userData.name || 'Admin User';
+    if (profileRole) profileRole.textContent = userData.role ? userData.role.charAt(0).toUpperCase() + userData.role.slice(1) : 'Admin';
+    if (profileEmail) profileEmail.textContent = userData.email || user.email || 'N/A';
+    if (profilePhone) profilePhone.textContent = userData.phone || 'Not provided';
+    if (profileLastLogin) profileLastLogin.textContent = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString() : 'N/A';
+    if (profileCreated) profileCreated.textContent = user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleString() : 'N/A';
+    if (profileSubscription) profileSubscription.textContent = userData.subscription_plan || 'N/A';
 }
 
 // Authentication Check
 auth.onAuthStateChanged(user => {
     if (user) {
-        console.log('User authenticated:', {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName
-        });
-        db.ref('active_session').once('value').then(snapshot => {
-            const activeSession = snapshot.val();
-            if (activeSession && activeSession.uid !== user.uid) {
-                console.log('User not in active session. Signing out:', user.uid);
-                alert('Another user has logged in. Signing you out.');
-                auth.signOut().then(() => {
-                    window.location.href = '/login.html';
-                });
-                return;
-            }
-
-            db.ref('users/' + user.uid).once('value').then(snapshot => {
-                const userData = snapshot.val();
-                console.log('User data from database:', userData);
-                if (userData && userData.role === 'admin') {
-                    if (adminNameElement) {
-                        adminNameElement.textContent = userData.name || 'Admin';
-                    } else {
-                        console.warn('adminNameElement not found in DOM');
-                    }
-                    loadProfile(user, userData);
-                    loadDashboard();
-                    loadUsers();
-                    loadPayments();
-                    loadSubscriptions();
-                    loadRevenue();
-
-                    // Update last login
-                    db.ref('users/' + user.uid).update({
-                        lastLogin: Date.now()
-                    }).catch(error => {
-                        console.error('Error updating last login:', error);
-                    });
-                } else {
-                    console.error('User is not an admin:', { userData, uid: user.uid, email: user.email });
-                    alert('Access denied. Admin setup failed.');
-                    auth.signOut().then(() => {
-                        window.location.href = '/login.html';
-                    });
+        db.ref('users/' + user.uid).once('value').then(snapshot => {
+            const userData = snapshot.val();
+            if (userData && userData.role === 'admin') {
+                if (adminNameElement) {
+                    adminNameElement.textContent = userData.name || 'Admin';
                 }
-            }).catch(error => {
-                console.error('Error fetching user data:', error);
-                alert('Failed to verify user data. Error: ' + error.message);
+                loadProfile(user, userData);
+                loadDashboard();
+                loadUsers();
+                loadPayments();
+                loadSubscriptions();
+                loadRevenue();
+
+                // Update last login
+                db.ref('users/' + user.uid).update({
+                    lastLogin: Date.now()
+                }).catch(error => {
+                    console.error('Error updating last login:', error);
+                });
+            } else {
+                alert('Access denied. Admin setup failed.');
                 auth.signOut().then(() => {
                     window.location.href = '/login.html';
                 });
-            });
+            }
         }).catch(error => {
-            console.error('Error checking active session:', error);
-            alert('Failed to verify session. Error: ' + error.message);
+            console.error('Error fetching user data:', error);
+            alert('Failed to verify user data. Error: ' + error.message);
             auth.signOut().then(() => {
                 window.location.href = '/login.html';
             });
         });
     } else {
-        console.log('No user authenticated. Redirecting to login.');
         window.location.href = '/login.html';
     }
 });
 
 // Change Admin Credentials
-function changeAdminCredentials() {
-    const newEmail = document.getElementById('new-admin-email').value.trim();
-    const newPassword = document.getElementById('new-admin-password').value;
+async function changeAdminCredentials() {
+    const newEmail = document.getElementById('new-admin-email')?.value.trim();
+    const newPassword = document.getElementById('new-admin-password')?.value;
 
     if (!newEmail && !newPassword) {
         alert('Please enter a new email or password.');
@@ -168,29 +150,29 @@ function changeAdminCredentials() {
         return;
     }
 
-    const promises = [];
-
-    if (newEmail) {
-        promises.push(
-            user.updateEmail(newEmail).then(() => {
-                return db.ref('users/' + user.uid).update({ email: newEmail });
-            })
-        );
-    }
-
-    if (newPassword) {
-        promises.push(user.updatePassword(newPassword));
-    }
-
-    Promise.all(promises).then(() => {
-        console.log('Admin credentials updated:', { newEmail, newPassword: newPassword ? '******' : 'unchanged' });
+    try {
+        const promises = [];
+        if (newEmail) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+                throw new Error('Invalid email format.');
+            }
+            await user.updateEmail(newEmail);
+            promises.push(db.ref('users/' + user.uid).update({ email: newEmail }));
+        }
+        if (newPassword) {
+            if (newPassword.length < 6) {
+                throw new Error('Password must be at least 6 characters.');
+            }
+            promises.push(user.updatePassword(newPassword));
+        }
+        await Promise.all(promises);
         alert('Admin credentials updated successfully.');
-        document.getElementById('new-admin-email').value = '';
-        document.getElementById('new-admin-password').value = '';
-    }).catch(error => {
+        if (document.getElementById('new-admin-email')) document.getElementById('new-admin-email').value = '';
+        if (document.getElementById('new-admin-password')) document.getElementById('new-admin-password').value = '';
+    } catch (error) {
         console.error('Error updating admin credentials:', error);
         alert('Failed to update credentials: ' + error.message);
-    });
+    }
 }
 
 // Log Activity
@@ -205,352 +187,354 @@ function logActivity(userEmail, action) {
 }
 
 // Load Dashboard Data
-function loadDashboard() {
-    // Total Users
-    db.ref('users').once('value').then(snapshot => {
-        document.getElementById('total-users').textContent = snapshot.numChildren() || 0;
-    }).catch(error => {
-        console.error('Error loading total users:', error);
-        document.getElementById('total-users').textContent = 'N/A';
-    });
+async function loadDashboard() {
+    try {
+        // Total Users
+        const userSnapshot = await db.ref('users').once('value');
+        if (document.getElementById('total-users')) {
+            document.getElementById('total-users').textContent = userSnapshot.numChildren() || 0;
+        }
 
-    // Active Subscriptions
-    db.ref('users').once('value').then(snapshot => {
+        // Active Subscriptions
         let activeSubs = 0;
-        snapshot.forEach(child => {
+        userSnapshot.forEach(child => {
             const user = child.val();
             if (user.subscription_status && user.subscription_expiry > Date.now()) {
                 activeSubs++;
             }
         });
-        document.getElementById('active-subs').textContent = activeSubs;
-    }).catch(error => {
-        console.error('Error loading active subscriptions:', error);
-        document.getElementById('active-subs').textContent = 'N/A';
-    });
+        if (document.getElementById('active-subs')) {
+            document.getElementById('active-subs').textContent = activeSubs;
+        }
 
-    // Pending Payments
-    db.ref('pending_payments').once('value').then(snapshot => {
-        document.getElementById('pending-payments').textContent = snapshot.numChildren() || 0;
-    }).catch(error => {
-        console.error('Error loading pending payments:', error);
-        document.getElementById('pending-payments').textContent = 'N/A';
-    });
+        // Pending Payments
+        const paymentSnapshot = await db.ref('pending_payments').once('value');
+        if (document.getElementById('pending-payments')) {
+            document.getElementById('pending-payments').textContent = paymentSnapshot.numChildren() || 0;
+        }
 
-    // Revenue (This Month)
-    db.ref('users').once('value').then(snapshot => {
+        // Revenue (This Month)
         let totalRevenue = 0;
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
-
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                const user = child.val();
-                if (
-                    user.subscription_status &&
-                    user.subscription_expiry > Date.now() &&
-                    user.subscription_amount &&
-                    user.subscription_start
-                ) {
-                    const startDate = new Date(user.subscription_start);
-                    if (!isNaN(startDate) && startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
-                        totalRevenue += parseFloat(user.subscription_amount) || 0;
-                    }
+        userSnapshot.forEach(child => {
+            const user = child.val();
+            if (
+                user.subscription_status &&
+                user.subscription_expiry > Date.now() &&
+                user.subscription_amount &&
+                user.subscription_start
+            ) {
+                const startDate = new Date(user.subscription_start);
+                if (!isNaN(startDate) && startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
+                    totalRevenue += parseFloat(user.subscription_amount) || 0;
                 }
-            });
-        }
-
-        document.getElementById('revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
-    }).catch(error => {
-        console.error('Error loading revenue:', error);
-        document.getElementById('revenue').textContent = '₹0';
-    });
-
-    // Recent Activity
-    db.ref('activity').orderByChild('timestamp').limitToLast(5).once('value').then(snapshot => {
-        recentActivity.innerHTML = '';
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                const activity = child.val();
-                const li = document.createElement('li');
-                li.textContent = `${activity.user} ${activity.action} at ${new Date(activity.timestamp).toLocaleString()}`;
-                recentActivity.appendChild(li);
-            });
-        } else {
-            recentActivity.innerHTML = '<li>No recent activity.</li>';
-        }
-    }).catch(error => {
-        console.error('Error loading recent activity:', error);
-        recentActivity.innerHTML = '<li>Error loading activity.</li>';
-    });
-
-    // Subscription Chart
-    try {
-        if (!window.Chart) {
-            throw new Error('Chart.js not loaded');
-        }
-        const ctx = document.getElementById('subscription-chart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-                datasets: [{
-                    label: 'Subscriptions',
-                    data: [50, 75, 100, 120, 150],
-                    borderColor: '#2e71cc',
-                    fill: false
-                }]
-            },
-            options: { responsive: true }
+            }
         });
+        if (document.getElementById('revenue')) {
+            document.getElementById('revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
+        }
+
+        // Recent Activity
+        const activitySnapshot = await db.ref('activity').orderByChild('timestamp').limitToLast(5).once('value');
+        if (recentActivity) {
+            recentActivity.innerHTML = '';
+            if (activitySnapshot.exists()) {
+                activitySnapshot.forEach(child => {
+                    const activity = child.val();
+                    const li = document.createElement('li');
+                    li.textContent = `${activity.user} ${activity.action} at ${new Date(activity.timestamp).toLocaleString()}`;
+                    recentActivity.appendChild(li);
+                });
+            } else {
+                recentActivity.innerHTML = '<li>No recent activity.</li>';
+            }
+        }
+
+        // Subscription Chart (Note: Hardcoded data, consider fetching from DB for production)
+        if (window.Chart && document.getElementById('subscription-chart')) {
+            try {
+                const ctx = document.getElementById('subscription-chart').getContext('2d');
+                if (!ctx) throw new Error('Chart canvas context not found');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+                        datasets: [{
+                            label: 'Subscriptions',
+                            data: [50, 75, 100, 120, 150],
+                            borderColor: '#2e71cc',
+                            fill: false
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            } catch (error) {
+                console.error('Error initializing chart:', error);
+            }
+        }
     } catch (error) {
-        console.error('Error initializing chart:', error);
+        console.error('Error loading dashboard:', error);
+        if (document.getElementById('total-users')) document.getElementById('total-users').textContent = 'N/A';
+        if (document.getElementById('active-subs')) document.getElementById('active-subs').textContent = 'N/A';
+        if (document.getElementById('pending-payments')) document.getElementById('pending-payments').textContent = 'N/A';
+        if (document.getElementById('revenue')) document.getElementById('revenue').textContent = '₹0';
+        if (recentActivity) recentActivity.innerHTML = '<li>Error loading activity.</li>';
     }
 }
 
 // Load Users
 function loadUsers() {
     db.ref('users').on('value', snapshot => {
-        userTableBody.innerHTML = '';
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                const user = child.val();
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${user.name || 'N/A'}</td>
-                    <td>${user.email || 'N/A'}</td>
-                    <td>${user.role || 'user'}</td>
-                    <td>${user.subscription_status ? 'Active' : 'Inactive'}</td>
-                    <td>
-                        <button onclick="editUser('${child.key}')">Edit</button>
-                        <button onclick="deleteUser('${child.key}')">Delete</button>
-                    </td>
-                `;
-                userTableBody.appendChild(row);
-            });
-        } else {
-            userTableBody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+        if (userTableBody) {
+            userTableBody.innerHTML = '';
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    const user = child.val();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.name || 'N/A'}</td>
+                        <td>${user.email || 'N/A'}</td>
+                        <td>${user.role || 'user'}</td>
+                        <td>${user.subscription_status ? 'Active' : 'Inactive'}</td>
+                        <td>
+                            <button onclick="editUser('${child.key}')">Edit</button>
+                            <button onclick="deleteUser('${child.key}')">Delete</button>
+                        </td>
+                    `;
+                    userTableBody.appendChild(row);
+                });
+            } else {
+                userTableBody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+            }
         }
     }, error => {
         console.error('Error loading users:', error);
-        userTableBody.innerHTML = '<tr><td colspan="5">Error loading users.</td></tr>';
+        if (userTableBody) {
+            userTableBody.innerHTML = '<tr><td colspan="5">Error loading users.</td></tr>';
+        }
     });
 }
 
 // Load Payments
-function loadPayments() {
-    db.ref('pending_payments').on('value', snapshot => {
-        paymentTableBody.innerHTML = '';
-        if (snapshot.exists()) {
-            const paymentPromises = [];
-            snapshot.forEach(child => {
-                const payment = child.val();
-                const userId = child.key;
-                console.log(`Loading payment for user ${userId}:`, payment);
-                paymentPromises.push(
-                    db.ref('users/' + userId).once('value').then(userSnapshot => {
-                        const user = userSnapshot.val() || {};
-                        const plan = payment.plan && typeof payment.plan === 'string' ? payment.plan : 'Unknown Plan';
-                        const amount = payment.amount && !isNaN(payment.amount) ? payment.amount : (PLAN_AMOUNTS[plan] || 0);
-                        if (!payment.plan) {
-                            console.warn(`Missing plan for user ${userId}, defaulting to 'Unknown Plan'`);
-                        }
-                        if (!payment.amount || isNaN(payment.amount)) {
-                            console.warn(`Missing or invalid amount for user ${userId}, defaulting to ₹${amount}`);
-                        }
-                        return `
-                            <tr>
-                                <td>${user.name || 'N/A'}</td>
-                                <td>${plan}</td>
-                                <td>₹${amount}</td>
-                                <td>${payment.unique_id || 'N/A'}</td>
-                                <td>${payment.status || 'Pending'}</td>
-                                <td>
-                                    <button onclick="approvePayment('${userId}')">Approve</button>
-                                    <button onclick="rejectPayment('${userId}')">Reject</button>
-                                </td>
-                            </tr>
-                        `;
-                    }).catch(error => {
-                        console.error(`Error fetching user ${userId} for payment:`, error);
-                        return '';
-                    })
-                );
-            });
-            Promise.all(paymentPromises).then(rows => {
-                paymentTableBody.innerHTML = rows.join('');
-                if (!rows.some(row => row)) {
-                    paymentTableBody.innerHTML = '<tr><td colspan="6">No valid payments found.</td></tr>';
+async function loadPayments() {
+    try {
+        db.ref('pending_payments').on('value', async snapshot => {
+            if (paymentTableBody) {
+                paymentTableBody.innerHTML = '';
+                if (snapshot.exists()) {
+                    const paymentPromises = [];
+                    snapshot.forEach(child => {
+                        const payment = child.val();
+                        const userId = child.key;
+                        paymentPromises.push(
+                            db.ref('users/' + userId).once('value').then(userSnapshot => {
+                                const user = userSnapshot.val() || {};
+                                const plan = payment.plan && typeof payment.plan === 'string' && VALID_PLANS.includes(payment.plan) ? payment.plan : 'Unknown Plan';
+                                const amount = payment.amount && !isNaN(payment.amount) ? payment.amount : (PLAN_AMOUNTS[plan] || 0);
+                                return `
+                                    <tr>
+                                        <td>${user.name || 'N/A'}</td>
+                                        <td>${plan}</td>
+                                        <td>₹${amount}</td>
+                                        <td>${payment.unique_id || 'N/A'}</td>
+                                        <td>${payment.status || 'Pending'}</td>
+                                        <td>
+                                            <button onclick="approvePayment('${userId}')">Approve</button>
+                                            <button onclick="rejectPayment('${userId}')">Reject</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).catch(error => {
+                                console.error(`Error fetching user ${userId} for payment:`, error);
+                                return '';
+                            })
+                        );
+                    });
+                    const rows = await Promise.all(paymentPromises);
+                    paymentTableBody.innerHTML = rows.join('') || '<tr><td colspan="6">No valid payments found.</td></tr>';
+                } else {
+                    paymentTableBody.innerHTML = '<tr><td colspan="6">No payments found.</td></tr>';
                 }
-            }).catch(error => {
-                console.error('Error processing payments:', error);
-                paymentTableBody.innerHTML = '<tr><td colspan="6">Error loading payments.</td></tr>';
-            });
-        } else {
-            paymentTableBody.innerHTML = '<tr><td colspan="6">No payments found.</td></tr>';
-        }
-    }, error => {
+            }
+        });
+    } catch (error) {
         console.error('Error loading payments:', error);
-        paymentTableBody.innerHTML = '<tr><td colspan="6">Error loading payments.</td></tr>';
-    });
+        if (paymentTableBody) {
+            paymentTableBody.innerHTML = '<tr><td colspan="6">Error loading payments.</td></tr>';
+        }
+    }
 }
 
 // Load Subscriptions
 function loadSubscriptions() {
     db.ref('users').on('value', snapshot => {
-        subscriptionTableBody.innerHTML = '';
-        if (snapshot.exists()) {
-            let hasActiveSubscriptions = false;
-            snapshot.forEach(child => {
-                const user = child.val();
-                if (user.subscription_status && user.subscription_expiry > Date.now()) {
-                    hasActiveSubscriptions = true;
-                    const startDate = user.subscription_start ? new Date(user.subscription_start).toLocaleDateString() : 'N/A';
-                    const expiryDate = user.subscription_expiry ? new Date(user.subscription_expiry).toLocaleDateString() : 'N/A';
-                    const timeLeftMs = user.subscription_expiry - Date.now();
-                    const daysLeft = Math.floor(timeLeftMs / (1000 * 60 * 60 * 24));
-                    const hoursLeft = Math.floor((timeLeftMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                    const timeLeft = `${daysLeft} days, ${hoursLeft} hours`;
-                    const plan = VALID_PLANS.includes(user.subscription_plan) ? user.subscription_plan : user.subscription_plan || 'Core Monthly';
+        if (subscriptionTableBody) {
+            subscriptionTableBody.innerHTML = '';
+            if (snapshot.exists()) {
+                let hasActiveSubscriptions = false;
+                snapshot.forEach(child => {
+                    const user = child.val();
+                    if (user.subscription_status && user.subscription_expiry > Date.now()) {
+                        hasActiveSubscriptions = true;
+                        const startDate = user.subscription_start ? new Date(user.subscription_start).toLocaleDateString() : 'N/A';
+                        const expiryDate = user.subscription_expiry ? new Date(user.subscription_expiry).toLocaleDateString() : 'N/A';
+                        const timeLeftMs = user.subscription_expiry - Date.now();
+                        const daysLeft = Math.floor(timeLeftMs / (1000 * 60 * 60 * 24));
+                        const hoursLeft = Math.floor((timeLeftMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const timeLeft = `${daysLeft} days, ${hoursLeft} hours`;
+                        const plan = VALID_PLANS.includes(user.subscription_plan) ? user.subscription_plan : user.subscription_plan || 'Core Monthly';
 
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${user.name || 'N/A'}</td>
-                        <td>${user.email || 'N/A'}</td>
-                        <td>${plan}</td>
-                        <td>${startDate}</td>
-                        <td>${expiryDate}</td>
-                        <td>${timeLeft}</td>
-                    `;
-                    subscriptionTableBody.appendChild(row);
-                }
-            });
-            if (!hasActiveSubscriptions) {
-                subscriptionTableBody.innerHTML = '<tr><td colspan="6">No active subscriptions found.</td></tr>';
-            }
-        } else {
-            subscriptionTableBody.innerHTML = '<tr><td colspan="6">No users found.</td></tr>';
-        }
-    }, error => {
-        console.error('Error loading subscriptions:', error);
-        subscriptionTableBody.innerHTML = '<tr><td colspan="6">Error loading subscriptions.</td></tr>';
-    });
-}
-
-// Load Revenue
-function loadRevenue() {
-    const filter = document.getElementById('revenue-filter')?.value || 'all-active';
-    console.log(`Loading revenue with filter: ${filter}`);
-
-    db.ref('users').once('value').then(snapshot => {
-        console.log('Users snapshot:', snapshot.val());
-        revenueTableBody.innerHTML = '';
-        let totalRevenue = 0;
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        let hasActiveSubscriptions = false;
-
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                const user = child.val();
-                const userId = child.key;
-                console.log(`Checking user ${userId}:`, user);
-
-                if (user.subscription_status && user.subscription_expiry > Date.now()) {
-                    hasActiveSubscriptions = true;
-                    const startDate = user.subscription_start ? new Date(user.subscription_start) : null;
-                    const plan = VALID_PLANS.includes(user.subscription_plan) ? user.subscription_plan : user.subscription_plan || 'Core Monthly';
-                    const amount = user.subscription_amount && !isNaN(user.subscription_amount) ? user.subscription_amount : (PLAN_AMOUNTS[plan] || 0);
-
-                    if (!user.subscription_amount) {
-                        console.warn(`Missing subscription_amount for user ${userId}, defaulting to ₹${amount}`);
-                    }
-                    if (!user.subscription_plan) {
-                        console.warn(`Missing subscription_plan for user ${userId}, defaulting to ${plan}`);
-                    }
-                    if (!user.subscription_start) {
-                        console.warn(`Missing subscription_start for user ${userId}, excluding from this-month filter`);
-                    }
-                    if (user.subscription_start && isNaN(startDate)) {
-                        console.warn(`Invalid subscription_start for user ${userId}: ${user.subscription_start}, excluding from this-month filter`);
-                    }
-
-                    // Include based on filter
-                    let includeInTable = false;
-                    if (filter === 'all-active') {
-                        includeInTable = true;
-                        totalRevenue += parseFloat(amount) || 0;
-                    } else if (filter === 'this-month' && startDate && !isNaN(startDate) && startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
-                        includeInTable = true;
-                        totalRevenue += parseFloat(amount) || 0;
-                    }
-
-                    if (includeInTable) {
-                        console.log(`Including user ${userId} in revenue table: Plan=${plan}, Amount=₹${amount}, Start=${startDate ? startDate.toLocaleDateString() : 'N/A'}`);
                         const row = document.createElement('tr');
                         row.innerHTML = `
                             <td>${user.name || 'N/A'}</td>
                             <td>${user.email || 'N/A'}</td>
                             <td>${plan}</td>
-                            <td>₹${amount}</td>
-                            <td>${startDate ? startDate.toLocaleDateString() : 'N/A'}</td>
+                            <td>${startDate}</td>
+                            <td>${expiryDate}</td>
+                            <td>${timeLeft}</td>
                         `;
-                        revenueTableBody.appendChild(row);
-                    } else {
-                        console.log(`Excluding user ${userId}: Filter=${filter}, Start=${startDate ? startDate.toLocaleDateString() : 'N/A'}`);
+                        subscriptionTableBody.appendChild(row);
                     }
-                } else {
-                    console.log(`Excluding user ${userId}: subscription_status=${user.subscription_status}, expiry=${user.subscription_expiry}, now=${Date.now()}`);
+                });
+                if (!hasActiveSubscriptions) {
+                    subscriptionTableBody.innerHTML = '<tr><td colspan="6">No active subscriptions found.</td></tr>';
                 }
-            });
-
-            if (!hasActiveSubscriptions) {
-                revenueTableBody.innerHTML = '<tr><td colspan="5">No active subscriptions found.</td></tr>';
-            } else if (revenueTableBody.innerHTML === '') {
-                revenueTableBody.innerHTML = `<tr><td colspan="5">No subscriptions match the filter "${filter === 'this-month' ? 'This Month' : 'All Active'}".</td></tr>`;
+            } else {
+                subscriptionTableBody.innerHTML = '<tr><td colspan="6">No users found.</td></tr>';
             }
+        }
+    }, error => {
+        console.error('Error loading subscriptions:', error);
+        if (subscriptionTableBody) {
+            subscriptionTableBody.innerHTML = '<tr><td colspan="6">Error loading subscriptions.</td></tr>';
+        }
+    });
+}
 
-            document.getElementById('total-revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
-        } else {
-            revenueTableBody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+// Load Revenue
+async function loadRevenue() {
+    const filter = revenueFilter?.value || 'all-active';
+    try {
+        const snapshot = await db.ref('users').once('value');
+        if (revenueTableBody) {
+            revenueTableBody.innerHTML = '';
+            let totalRevenue = 0;
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            let hasActiveSubscriptions = false;
+
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    const user = child.val();
+                    const userId = child.key;
+                    if (user.subscription_status && user.subscription_expiry > Date.now()) {
+                        hasActiveSubscriptions = true;
+                        const startDate = user.subscription_start ? new Date(user.subscription_start) : null;
+                        const plan = VALID_PLANS.includes(user.subscription_plan) ? user.subscription_plan : user.subscription_plan || 'Core Monthly';
+                        const amount = user.subscription_amount && !isNaN(user.subscription_amount) ? user.subscription_amount : (PLAN_AMOUNTS[plan] || 0);
+
+                        let includeInTable = false;
+                        if (filter === 'all-active') {
+                            includeInTable = true;
+                            totalRevenue += parseFloat(amount) || 0;
+                        } else if (filter === 'this-month' && startDate && !isNaN(startDate) && startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
+                            includeInTable = true;
+                            totalRevenue += parseFloat(amount) || 0;
+                        }
+
+                        if (includeInTable) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${user.name || 'N/A'}</td>
+                                <td>${user.email || 'N/A'}</td>
+                                <td>${plan}</td>
+                                <td>₹${amount}</td>
+                                <td>${startDate ? startDate.toLocaleDateString() : 'N/A'}</td>
+                            `;
+                            revenueTableBody.appendChild(row);
+                        }
+                    }
+                });
+
+                if (!hasActiveSubscriptions) {
+                    revenueTableBody.innerHTML = '<tr><td colspan="5">No active subscriptions found.</td></tr>';
+                } else if (revenueTableBody.innerHTML === '') {
+                    revenueTableBody.innerHTML = `<tr><td colspan="5">No subscriptions match the filter "${filter === 'this-month' ? 'This Month' : 'All Active'}".</td></tr>`;
+                }
+
+                if (document.getElementById('total-revenue')) {
+                    document.getElementById('total-revenue').textContent = `₹${totalRevenue.toFixed(2)}`;
+                }
+            } else {
+                revenueTableBody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+                if (document.getElementById('total-revenue')) {
+                    document.getElementById('total-revenue').textContent = '₹0';
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading revenue:', error);
+        if (revenueTableBody) {
+            revenueTableBody.innerHTML = `<tr><td colspan="5">Error loading revenue: ${error.message}</td></tr>`;
+        }
+        if (document.getElementById('total-revenue')) {
             document.getElementById('total-revenue').textContent = '₹0';
         }
-    }).catch(error => {
-        console.error('Error loading revenue:', error);
-        revenueTableBody.innerHTML = `<tr><td colspan="5">Error loading revenue: ${error.message}</td></tr>`;
-        document.getElementById('total-revenue').textContent = '₹0';
+    }
+}
+
+// Add Revenue Filter Event Listener
+if (revenueFilter) {
+    revenueFilter.addEventListener('change', () => {
+        loadRevenue();
     });
 }
 
 // Add User
-function addUser() {
-    const name = document.getElementById('user-name').value.trim();
-    const email = document.getElementById('user-email').value.trim();
-    const role = document.getElementById('user-role').value;
+async function addUser() {
+    const userNameInput = document.getElementById('user-name');
+    const userEmailInput = document.getElementById('user-email');
+    const userRoleInput = document.getElementById('user-role');
+
+    if (!userNameInput || !userEmailInput || !userRoleInput) {
+        alert('Form elements not found.');
+        return;
+    }
+
+    const name = userNameInput.value.trim();
+    const email = userEmailInput.value.trim();
+    const role = userRoleInput.value;
 
     if (!name || !email || !role) {
         alert('Please fill all fields.');
         return;
     }
 
-    const userId = db.ref('users').push().key;
-    db.ref('users/' + userId).set({
-        id: userId,
-        name,
-        email,
-        role,
-        subscription_status: false,
-        trial_used: false
-    }).then(() => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Invalid email format.');
+        return;
+    }
+
+    try {
+        const userId = db.ref('users').push().key;
+        await db.ref('users/' + userId).set({
+            id: userId,
+            name,
+            email,
+            role,
+            subscription_status: false,
+            trial_used: false
+        });
         closeModal('add-user-modal');
         alert('User added successfully.');
         logActivity(email, 'added as new user');
-    }).catch(error => {
+    } catch (error) {
         console.error('Error adding user:', error);
         alert('Error adding user: ' + error.message);
-    });
+    }
 }
 
 // Edit User (Placeholder)
@@ -559,131 +543,136 @@ function editUser(userId) {
 }
 
 // Delete User
-function deleteUser(userId) {
+async function deleteUser(userId) {
     if (confirm('Are you sure you want to delete this user?')) {
-        db.ref('users/' + userId).once('value', snapshot => {
+        try {
+            const snapshot = await db.ref('users/' + userId).once('value');
             const user = snapshot.val();
-            db.ref('users/' + userId).remove().then(() => {
-                alert('User deleted successfully.');
-                logActivity(user.email, 'deleted');
-            }).catch(error => {
-                console.error('Error deleting user:', error);
-                alert('Error deleting user: ' + error.message);
-            });
-        }).catch(error => {
-            console.error('Error fetching user for deletion:', error);
+            await db.ref('users/' + userId).remove();
+            alert('User deleted successfully.');
+            logActivity(user.email, 'deleted');
+        } catch (error) {
+            console.error('Error deleting user:', error);
             alert('Error deleting user: ' + error.message);
-        });
+        }
     }
 }
 
 // Approve Payment
-function approvePayment(userId) {
-    db.ref('pending_payments/' + userId).once('value').then(snapshot => {
+async function approvePayment(userId) {
+    try {
+        const snapshot = await db.ref('pending_payments/' + userId).once('value');
         const payment = snapshot.val();
         if (payment) {
-            console.log(`Approving payment for user ${userId}:`, payment);
             const plan = VALID_PLANS.includes(payment.plan) ? payment.plan : payment.plan || 'Core Monthly';
             const amount = payment.amount && !isNaN(payment.amount) ? payment.amount : (PLAN_AMOUNTS[plan] || 1000);
             const approvalTime = Date.now();
             const isYearly = plan.includes('Yearly');
-            const expiryDuration = isYearly ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000; // 1 year or 30 days
+            const expiryDuration = isYearly ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
 
-            db.ref('users/' + userId).update({
+            await db.ref('users/' + userId).update({
                 subscription_status: true,
                 subscription_expiry: approvalTime + expiryDuration,
                 subscription_plan: plan,
                 subscription_start: approvalTime,
                 subscription_amount: amount
-            }).then(() => {
-                db.ref('pending_payments/' + userId).remove().then(() => {
-                    alert('Payment approved and user updated.');
-                    db.ref('users/' + userId).once('value').then(userSnapshot => {
-                        const user = userSnapshot.val();
-                        logActivity(user.email, `payment approved for ${plan} (₹${amount})`);
-                    }).catch(error => {
-                        console.error('Error fetching user after payment approval:', error);
-                    });
-                }).catch(error => {
-                    console.error('Error removing pending payment:', error);
-                    alert('Error approving payment: ' + error.message);
-                });
-            }).catch(error => {
-                console.error('Error updating user for payment approval:', error);
-                alert('Error approving payment: ' + error.message);
             });
+            await db.ref('pending_payments/' + userId).remove();
+
+            const userSnapshot = await db.ref('users/' + userId).once('value');
+            const user = userSnapshot.val();
+            alert('Payment approved and user updated.');
+            logActivity(user.email, `payment approved for ${plan} (₹${amount})`);
         } else {
             alert('Payment not found.');
         }
-    }).catch(error => {
-        console.error('Error fetching payment:', error);
-        alert('Error fetching payment: ' + error.message);
-    });
+    } catch (error) {
+        console.error('Error approving payment:', error);
+        alert('Error approving payment: ' + error.message);
+    }
 }
 
 // Reject Payment
-function rejectPayment(userId) {
-    db.ref('users/' + userId).update({
-        subscription_status: false
-    }).then(() => {
-        db.ref('pending_payments/' + userId).remove().then(() => {
-            alert('Payment rejected and user updated.');
-            db.ref('users/' + userId).once('value').then(userSnapshot => {
-                const user = userSnapshot.val();
-                logActivity(user.email, 'payment rejected');
-            }).catch(error => {
-                console.error('Error fetching user after payment rejection:', error);
-            });
-        }).catch(error => {
-            console.error('Error removing pending payment:', error);
-            alert('Error rejecting payment: ' + error.message);
+async function rejectPayment(userId) {
+    try {
+        await db.ref('users/' + userId).update({
+            subscription_status: false
         });
-    }).catch(error => {
-        console.error('Error updating user for payment rejection:', error);
+        await db.ref('pending_payments/' + userId).remove();
+
+        const userSnapshot = await db.ref('users/' + userId).once('value');
+        const user = userSnapshot.val();
+        alert('Payment rejected and user updated.');
+        logActivity(user.email, 'payment rejected');
+    } catch (error) {
+        console.error('Error rejecting payment:', error);
         alert('Error rejecting payment: ' + error.message);
-    });
+    }
 }
 
 // Save Settings
-function saveSettings() {
-    const trialDuration = document.getElementById('trial-duration').value;
-    const mfaEnabled = document.getElementById('mfa-enabled').checked;
+async function saveSettings() {
+    const trialDurationInput = document.getElementById('trial-duration');
+    const mfaEnabledInput = document.getElementById('mfa-enabled');
 
-    db.ref('settings').set({
-        trial_duration: parseInt(trialDuration),
-        mfa_enabled: mfaEnabled
-    }).then(() => {
+    if (!trialDurationInput || !mfaEnabledInput) {
+        alert('Settings form elements not found.');
+        return;
+    }
+
+    const trialDuration = trialDurationInput.value;
+    const mfaEnabled = mfaEnabledInput.checked;
+
+    if (!trialDuration || isNaN(trialDuration) || parseInt(trialDuration) <= 0) {
+        alert('Please enter a valid positive trial duration.');
+        return;
+    }
+
+    try {
+        await db.ref('settings').set({
+            trial_duration: parseInt(trialDuration),
+            mfa_enabled: mfaEnabled
+        });
         alert('Settings saved successfully.');
         logActivity('Admin', 'settings updated');
-    }).catch(error => {
+    } catch (error) {
         console.error('Error saving settings:', error);
         alert('Error saving settings: ' + error.message);
-    });
+    }
 }
 
 // Edit Profile
-function editProfile() {
+async function editProfile() {
     const user = auth.currentUser;
     if (!user) {
         alert('No user is currently logged in.');
         return;
     }
 
-    db.ref('users/' + user.uid).once('value').then(snapshot => {
+    try {
+        const snapshot = await db.ref('users/' + user.uid).once('value');
         const userData = snapshot.val();
-        document.getElementById('edit-name').value = userData.name || '';
-        document.getElementById('edit-phone').value = userData.phone || '';
-        document.getElementById('edit-profile-modal').style.display = 'flex';
-    }).catch(error => {
+        const editNameInput = document.getElementById('edit-name');
+        const editPhoneInput = document.getElementById('edit-phone');
+        const editProfileModal = document.getElementById('edit-profile-modal');
+
+        if (editNameInput && editPhoneInput && editProfileModal) {
+            editNameInput.value = userData.name || '';
+            editPhoneInput.value = userData.phone || '';
+            editProfileModal.style.display = 'flex';
+        } else {
+            alert('Profile form elements not found.');
+        }
+    } catch (error) {
         console.error('Error loading profile data:', error);
         alert('Error loading profile data: ' + error.message);
-    });
+    }
 }
 
 // Save Profile
-function saveProfile() {
-    const name = document.getElementById('edit-name').value.trim();
-    const phone = document.getElementById('edit-phone').value.trim();
+async function saveProfile() {
+    const name = document.getElementById('edit-name')?.value.trim();
+    const phone = document.getElementById('edit-phone')?.value.trim();
     const user = auth.currentUser;
 
     if (!user) {
@@ -696,41 +685,44 @@ function saveProfile() {
         return;
     }
 
-    db.ref('users/' + user.uid).update({
-        name,
-        phone: phone || null
-    }).then(() => {
+    try {
+        await db.ref('users/' + user.uid).update({
+            name,
+            phone: phone || null
+        });
         closeModal('edit-profile-modal');
         alert('Profile updated successfully.');
         logActivity(user.email, 'profile updated');
-    }).catch(error => {
+    } catch (error) {
         console.error('Error updating profile:', error);
         alert('Error updating profile: ' + error.message);
-    });
+    }
 }
 
 // Modal Controls
 function showAddUserModal() {
-    document.getElementById('add-user-modal').style.display = 'flex';
+    const modal = document.getElementById('add-user-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 // Logout
-function handleLogout() {
-    db.ref('active_session').remove().then(() => {
-        auth.signOut().then(() => {
-            window.location.href = '/login.html';
-        }).catch(error => {
-            console.error('Error signing out:', error);
-            alert('Error logging out: ' + error.message);
-        });
-    }).catch(error => {
-        console.error('Error removing active session:', error);
+async function handleLogout() {
+    try {
+        await auth.signOut();
+        window.location.href = '/login.html';
+    } catch (error) {
+        console.error('Error signing out:', error);
         alert('Error logging out: ' + error.message);
-    });
+    }
 }
 
 // Initialize
