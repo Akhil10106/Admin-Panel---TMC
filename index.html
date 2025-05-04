@@ -8,7 +8,21 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-gray-100 font-inter">
-    <div class="app-container">
+    <!-- Login View -->
+    <div class="login-container" id="login-view">
+        <div class="login-card">
+            <h1>TMC Admin Login</h1>
+            <p class="subtitle">Access your admin dashboard.</p>
+            <div class="form-group">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button class="btn primary" onclick="handleLogin()">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="app-container" id="admin-panel" style="display: none;">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -299,14 +313,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-colorschemes"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
     <script src="script.js"></script>
 </body>
 </html>
